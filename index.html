@@ -296,7 +296,7 @@ async function generatePDF({ receiptno1, fccid1, vehicle1, amountRaw, atot, vtot
     line("Thank You! Please Visit Again..");
 
     // 4️⃣ Send data to Google Sheet (CORS enabled)
-    const sheetResponse = await fetch("https://script.google.com/macros/s/AKfycbwT0S0kUxJj3iwNxkyHXM9Fl1r-CfM7DYQfu7V1Duo6u1CtSkIFyo9vuciE4AVsBGvM_g/exec", {
+    const sheetResponse = await fetch("https://script.google.com/macros/s/AKfycbwnE3o46gCiXQosr4ugGU6OTAITogBPftbumitpDjJHi_qcs36aGKGV1H4yQITwEIhHUQ/exec", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ formattedDate, timeString, receiptno1, fccid1, atot, vtot, volume, amountRaw, vehicle1, mobile })
