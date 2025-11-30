@@ -296,18 +296,22 @@ async function generatePDF({ receiptno1, fccid1, vehicle1, amountRaw, atot, vtot
     line("Thank You! Please Visit Again..");
 
     // 4️⃣ Send data to Google Sheet (CORS enabled)
-    const sheetResponse = await fetch("https://script.google.com/macros/s/AKfycbwnE3o46gCiXQosr4ugGU6OTAITogBPftbumitpDjJHi_qcs36aGKGV1H4yQITwEIhHUQ/exec", {
+    const sheetResponse = await fetch("https://script.google.com/macros/s/AKfycbyLIq_gY8dy5uoDOZ4_fyfevboufuDFiicBGJ68GZ6xmE7h7O-8Oy7hPrw9TPXErK7rCw/exec", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ formattedDate, timeString, receiptno1, fccid1, atot, vtot, volume, amountRaw, vehicle1, mobile })
-    });
+      //headers: { "Content-Type": "application/json" },
+    
+   headers: { "Content-Type": "text/plain;charset=utf-8" },
+     body: JSON.stringify({ formattedDate, timeString, receiptno1, fccid1, atot, vtot, volume, amountRaw, vehicle1, mobile })
+  });
+    
 
-    const data = await sheetResponse.json();
+     const text = await sheetResponse.text();
+    const data = JSON.parse(text);
 
     if (data.status === "success") {
-      // 5️⃣ Add canvas to PDF and save
+      // Example: generate PDF after saving
       const textImg = textCanvas.toDataURL('image/png');
-      const pdfHeightScale = pdfWidthMM / canvasWidth * canvasHeight; // scale to fit width
+      const pdfHeightScale = pdfWidthMM / canvasWidth * canvasHeight;
       doc.addImage(textImg, 'PNG', 0, 42, pdfWidthMM, pdfHeightScale);
       doc.save(`receipt_${Date.now()}.pdf`);
       alert("Saved to Google Sheet and PDF generated successfully.");
@@ -316,7 +320,7 @@ async function generatePDF({ receiptno1, fccid1, vehicle1, amountRaw, atot, vtot
     }
 
   } catch (err) {
-    alert(err.message);
+    alert("Error sending data to Sheet: " + err.message);
   }
 }
       function validateReceiptNo(id, fieldName) {
