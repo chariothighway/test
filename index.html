@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Receipt Generator (Validated & Image Required)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background:#f4f4f4;
+      margin:0;
+      padding:20px;
+    }
+    section {
+      background:#fff;
+      border-radius:8px;
+      box-shadow:0 4px 10px rgba(0,0,0,.08);
+      padding:18px;
+      margin-bottom:20px;
+    }
+    h1 { text-align:center; color:#222; margin:6px 0 14px; }
+    textarea, input[type="file"], button {
+      display:block;
+      margin:8px auto;
+      padding:10px;
+      width:90%;
+      max-width:380px;
+      font-size:15px;
+      border:1px solid #ccc;
+      border-radius:6px;
+      box-sizing:border-box;
+    }
+    canvas { display:block; margin:14px auto; border:1px solid #ccc; max-width:95%; }
+    button { background:#007bff; color:#fff; cursor:pointer; font-weight:600; }
+    button[disabled] { background:#9bb8ff; cursor:not-allowed; }
+    @font-face {
+      font-family:'Technology-Bold';
+      src: url('https://raw.githubusercontent.com/chariothighway/test/99d2d70b8688b16d435d104fd99eb12158f730ba/Technology-Bold.ttf') format('truetype');
+    }
+  </style>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+  <section>
+    <h1>Receipt & Image Generator</h1>
+    <textarea id="receiptno" placeholder="Enter Receipt No (alphanumeric)..."></textarea>
+    <textarea id="fccid" placeholder="Enter FCC ID (number only)..."></textarea>
+    <textarea id="amount" placeholder="Enter Amount (number only)..."></textarea>
+    <textarea id="atot" placeholder="Enter Atot (number only)..."></textarea>
+    <textarea id="vtot" placeholder="Enter Vtot (number only)..."></textarea>
+    <textarea id="vehicle" placeholder="Enter Vehicle No (alphanumeric)..."></textarea>
+    <textarea id="mobile" placeholder="Enter Mobile No (optional, numbers only)..."></textarea>
+    <input type="file" id="imageInput" accept="image/*" />
+    <canvas id="canvas"></canvas>
+  </section>
+
+  <div style="text-align:center;">
+    <button id="submitBtn">Submit</button>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const imageInput = document.getElementById('imageInput');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const submitBtn = document.getElementById('submitBtn');
+      let img = null;
+
+      const MAX_CANVAS_WIDTH = 1200;
+      const MAX_CANVAS_HEIGHT = 1200;
+
+      // Load custom font
+      async function loadTechFont() {
+        try {
+          const f = new FontFace('Technology-Bold',
+            'url(https://raw.githubusercontent.com/chariothighway/test/99d2d70b8688b16d435d104fd99eb12158f730ba/Technology-Bold.ttf)');
+          await f.load();
+          document.fonts.add(f);
+        } catch (e) {
+          console.warn('Font load failed:', e);
+        }
+      }
+      loadTechFont();
+
+      function ensureImageLoaded(imageEl) {
+        return new Promise((resolve, reject) => {
+          if (!imageEl) return reject(new Error('Image is null'));
+          if (imageEl.complete && imageEl.naturalWidth !== 0) return resolve();
+          imageEl.onload = () => resolve();
+          imageEl.onerror = () => reject(new Error('Failed to load image'));
+        });
+      }
+
+      imageInput.addEventListener('change', async (ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) {
+          img = null;
+          canvas.width = canvas.height = 0;
+          return;
+        }
+        img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+
+        try {
+          await ensureImageLoaded(img);
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          const scale = Math.min(1, MAX_CANVAS_WIDTH / w, MAX_CANVAS_HEIGHT / h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+          canvas.width = w;
+          canvas.height = h;
+          ctx.clearRect(0,0,w,h);
+          ctx.drawImage(img, 0, 0, w, h);
+        } catch (err) {
+          alert('Error loading selected image.');
+          img = null;
+          canvas.width = canvas.height = 0;
+        }
+      });
+
+async function drawAndRotateImage(amountRaw) {
+  if (!img) {
+    alert('Please select an image before submitting.');
+    throw new Error('No image selected.');
+  }
+
+  await document.fonts.ready;
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Draw original image
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(img, 0, 0, w, h);
+
+  // Add overlay text
+  const formattedOriginal = amountRaw.toFixed(2);
+  const converted = (amountRaw / 93.15).toFixed(2);
+
+  ctx.font = `140px "Technology-Bold"`;
+  ctx.fillStyle = '#585F8F';
+  ctx.textBaseline = 'top';
+  const endX = 620;
+  ctx.fillText(formattedOriginal, endX - ctx.measureText(formattedOriginal).width, 180);
+  ctx.fillText(converted, endX - ctx.measureText(converted).width, 320);
+
+  // ROTATE
+  const angle = (Math.random() * 8 - 4) * Math.PI / 180;
+  const temp = document.createElement('canvas');
+  const tctx = temp.getContext('2d');
+  temp.width = w;
+  temp.height = h;
+
+  tctx.translate(w/2, h/2);
+  tctx.rotate(angle);
+  tctx.drawImage(canvas, -w/2, -h/2);
+  tctx.setTransform(1,0,0,1,0,0);
+
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(temp, 0, 0);
+
+
+  // --------------------------------------------------
+  // 🔥 CROP 30px FROM ALL FOUR SIDES
+  // --------------------------------------------------
+  const crop = 30;
+  const cw = w - crop * 2;
+  const ch = h - crop * 2;
+
+  const croppedCanvas = document.createElement('canvas');
+  croppedCanvas.width = cw;
+  croppedCanvas.height = ch;
+  const cctx = croppedCanvas.getContext('2d');
+
+  cctx.drawImage(
+    canvas,
+    crop, crop,   // start inside the original canvas
+    cw, ch,       // size of the inner part
+    0, 0,         // top-left of new canvas
+    cw, ch
+  );
+
+  // Replace original canvas contents with cropped version
+  canvas.width = cw;
+  canvas.height = ch;
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.drawImage(croppedCanvas, 0, 0);
+  // --------------------------------------------------
+
+
+  // SAVE CROPPED IMAGE
+  const link = document.createElement('a');
+  link.download = `display_${new Date().toISOString().replace(/[:.]/g,'-')}.jpg`;
+  link.href = canvas.toDataURL('image/jpeg', 0.95);
+  link.click();
+
+  return true;
+}
+
+
+async function generatePDF({ receiptno1, fccid1, vehicle1, amountRaw, atot, vtot, mobile }) {
+  try {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) throw new Error('jsPDF library not loaded.');
+
+    const pdfWidthMM = 57;
+    const pdfHeightMM = 190;
+    const doc = new jsPDF({ unit: 'mm', format: [pdfWidthMM, pdfHeightMM] });
+
+    // 1️⃣ Add top logo
+    const topLogo = new Image();
+    topLogo.src = 'https://raw.githubusercontent.com/chariothighway/test/0b6f2ff1107d3b8a78c4d57c8f246b1876f1a41f/logo4.jpeg';
+    await new Promise(res => topLogo.onload = res);
+    doc.addImage(topLogo, 'JPEG', 13, 2, 30, 40);
+
+    // 2️⃣ Create text canvas
+    const canvasWidth = 300;
+    const canvasHeight = 810;
+    const textCanvas = document.createElement('canvas');
+    textCanvas.width = canvasWidth;
+    textCanvas.height = canvasHeight;
+    const tctx = textCanvas.getContext('2d');
+
+    // Text settings
+    tctx.fillStyle = 'rgba(0,0,0,0.7)';
+    tctx.font = '19px Arial';
+    tctx.textBaseline = 'top';
+
+    let y = 2;
+    function line(text) {
+      tctx.fillText(text, 1, y);
+      y += 24;
+    }
+
+    // Format amounts
+    const amountFixed = amountRaw.toFixed(2);
+    const volume = (amountRaw / 93.15).toFixed(2);
+    const fccid2 = String(fccid1).padStart(16, '0');
+    const [atotInt, atotDec] = atot.toFixed(2).split('.');
+    const finalAtot = `${atotInt.padStart(11,'0')}.${atotDec}`;
+    const [vtotInt, vtotDec] = vtot.toFixed(3).split('.');
+    const finalVtot = `${vtotInt.padStart(10,'0')}.${vtotDec}`;
+
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2,'0');
+    const minutes = String(now.getMinutes()).padStart(2,'0');
+    const seconds = String(now.getSeconds()).padStart(2,'0');
+
+    const formattedDate = `${day}/${month}/${year}`;
+    const timeString = `${hours}:${minutes}:${seconds}`;
+
+    // 3️⃣ Draw receipt lines
+    line("CHARIOT HIGHWAY SERVICE");
+    line("BALUGAON BYPASS, NH 16");
+    line("KHURDA, ODISHA");
+    line("Tel. No. : 7749823079");
+    y += 13;
+    line(`Receipt No. : ${receiptno1}`);
+    line(`FCC ID: ${fccid2}`);
+    line("FIP No.       : 03");
+    line("Nozzle No   : 03");
+    line("Product       : Diesel");
+    y += 14;
+    line("Preset Type : Amount");
+    line("Rate            : 93.15");
+    line(`Volume(L)    : ${volume}`);
+    line(`Amount(Rs) : ${amountFixed}`);
+    line(`Atot:   ${finalAtot}`);
+    line(`Vtot:   ${finalVtot}`);
+    y += 34;
+    line(`Vehicle No  : ${vehicle1}`);
+    line(`Mobile No   : ${mobile ?? ""}`);
+    y += 16;
+    line(`Date  : ${formattedDate}`);
+    line(`Time  : ${timeString}`);
+    y += 18;
+    tctx.font = '18px Arial';
+    tctx.textBaseline = 'top';
+    line("CST No     :");
+    line("LST No      :");
+    line("VAT No      :");
+    line("ATTENDANT ID: Not Available");
+    line("FCC Date    : Not Available");
+    line("FCC Time    : Not Available");
+    y += 16;
+    tctx.font = '17.5px Arial';
+    tctx.textBaseline = 'top';
+    line("Thank You! Please Visit Again..");
+
+    // 4️⃣ Send data to Google Sheet (CORS enabled)
+    const sheetResponse = await fetch("https://script.google.com/macros/s/AKfycbwT0S0kUxJj3iwNxkyHXM9Fl1r-CfM7DYQfu7V1Duo6u1CtSkIFyo9vuciE4AVsBGvM_g/exec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ formattedDate, timeString, receiptno1, fccid1, atot, vtot, volume, amountRaw, vehicle1, mobile })
+    });
+
+    const data = await sheetResponse.json();
+
+    if (data.status === "success") {
+      // 5️⃣ Add canvas to PDF and save
+      const textImg = textCanvas.toDataURL('image/png');
+      const pdfHeightScale = pdfWidthMM / canvasWidth * canvasHeight; // scale to fit width
+      doc.addImage(textImg, 'PNG', 0, 42, pdfWidthMM, pdfHeightScale);
+      doc.save(`receipt_${Date.now()}.pdf`);
+      alert("Saved to Google Sheet and PDF generated successfully.");
+    } else {
+      alert("Failed to save to Google Sheet. PDF not generated.");
+    }
+
+  } catch (err) {
+    alert(err.message);
+  }
+}
+      function validateReceiptNo(id, fieldName) {
+        const value = document.getElementById(id).value.trim();
+        if (value === '') throw new Error(`${fieldName} cannot be empty.`);
+        if (!/^[a-zA-Z0-9]+$/.test(value))
+          throw new Error(`${fieldName} must be alphanumeric.`);
+        return value;
+      }
+
+      function validateNumberField(id, fieldName, allowBlank = false) {
+        const value = document.getElementById(id).value.trim();
+        if (allowBlank && value === '') return null;
+        if (value === '') throw new Error(`${fieldName} cannot be empty.`);
+        const num = parseFloat(value);
+        if (isNaN(num)) throw new Error(`${fieldName} must be a valid number.`);
+        return num;
+      }
+
+      submitBtn.addEventListener('click', async () => {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+
+        try {
+          const receiptno1 = validateReceiptNo('receiptno', 'Receipt No');
+          const fccid1 = validateNumberField('fccid', 'FCC ID');
+          const amountRaw = validateNumberField('amount', 'Amount');
+          const atot = validateNumberField('atot', 'Atot');
+          const vtot = validateNumberField('vtot', 'Vtot');
+          const vehicle1 = validateReceiptNo('vehicle', 'Vehicle No');
+          const mobile = validateNumberField('mobile', 'Mobile No', true);
+
+          if (!imageInput.files || imageInput.files.length === 0) {
+            throw new Error('Please select an image before submitting.');
+          }
+
+          await drawAndRotateImage(amountRaw);
+          generatePDF({ receiptno1, fccid1, vehicle1, amountRaw, atot, vtot, mobile });
+
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
